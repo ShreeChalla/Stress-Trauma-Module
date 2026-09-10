@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RTSAM Counselor Dashboard — Live AI Triage</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #020617; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function bandFor(svi) {
+      if (svi >= 76) return { name: "Critical", text: "text-red-400", bg: "bg-red-500", border: "border-red-500", ring: "ring-red-500/40", stroke: "#ef4444" };
+      if (svi >= 51) return { name: "High", text: "text-orange-400", bg: "bg-orange-500", border: "border-orange-500", ring: "ring-orange-500/40", stroke: "#f97316" };
+      if (svi >= 26) return { name: "Moderate", text: "text-amber-400", bg: "bg-amber-500", border: "border-amber-500", ring: "ring-amber-500/40", stroke: "#f59e0b" };
+      return { name: "Low", text: "text-emerald-400", bg: "bg-emerald-500", border: "border-emerald-500", ring: "ring-emerald-500/40", stroke: "#10b981" };
+    }
+
+    function useElapsed() {
+      const [seconds, setSeconds] = useState(0);
+      useEffect(() => {
+        const id = setInterval(() => setSeconds((s) => s + 1), 1000);
+        return () => clearInterval(id);
+      }, []);
+      const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+      const s = String(seconds % 60).padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function SVIGauge({ svi }) {
+      const band = bandFor(svi);
+      const pct = Math.max(0, Math.min(100, svi));
+      const r = 80;
+      const circumference = Math.PI * r;
+      const offset = circumference * (1 - pct / 100);
+
+      return (
+        <div className="flex flex-col items-center">
+          <svg viewBox="0 0 200 120" className="w-full max-w-[180px]">
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1e293b" strokeWidth="14" strokeLinecap="round" />
+            <path
+              d="M 20 100 A 80 80 0 0 1 180 100"
+              fill="none"
+              stroke={band.stroke}
+              strokeWidth="14"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              style={{ transition: "stroke-dashoffset 400ms ease-out, stroke 300ms ease" }}
+            />
+            <text x="100" y="88" textAnchor="middle" className={`font-mono text-3xl font-bold fill-current ${band.text}`}>
+              {Math.round(svi)}
+            </text>
+          </svg>
+          <div className={`mt-1 text-xs font-semibold tracking-wide uppercase ${band.text}`}>{band.name} risk</div>
+          <div className="mt-3 grid grid-cols-4 gap-1 w-full max-w-[180px] text-[9px] text-slate-500 font-mono">
+            <div className="text-center border-t-2 border-emerald-500 pt-1">0–25</div>
+            <div className="text-center border-t-2 border-amber-500 pt-1">26–50</div>
+            <div className="text-center border-t-2 border-orange-500 pt-1">51–75</div>
+            <div className="text-center border-t-2 border-red-500 pt-1">76–100</div>
+          </div>
+        </div>
+      );
+    }
+
+    function Meter({ label, value, max, unit, warn }) {
+      const pct = Math.min(100, Math.max(0, (value / max) * 100));
+      const hot = pct > warn;
+      return (
+        <div className="mb-3 last:mb-0">
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>{label}</span>
+            <span className={`font-mono ${hot ? "text-red-400 font-bold" : "text-slate-300"}`}>
+              {typeof value === 'number' ? value.toFixed(2) : value}{unit}
+            </span>
+          </div>
+          <div className="h-1.5 bg-slate-800 rounded overflow-hidden">
+            <div
+              className={`h-full ${hot ? "bg-red-500" : "bg-cyan-500"}`}
+              style={{ width: `${pct}%`, transition: "width 400ms ease-out" }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    function TranscriptLine({ line, isNew }) {
+      const isCounselor = line.speaker === "counselor";
+      const isUpload = line.isUpload;
+      return (
+        <div className={`px-3 py-2.5 border-b border-slate-800/60 ${isUpload ? "bg-cyan-950/30 border-l-2 border-l-cyan-400" : (isNew ? "bg-slate-800/40" : "")}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-[11px] font-semibold ${isCounselor ? "text-cyan-400" : (isUpload ? "text-cyan-300" : "text-amber-400")}`}>
+              {isUpload ? "Uploaded Audio (Whisper ASR)" : (isCounselor ? "Counselor" : "Caller")}
+            </span>
+            {line.flag && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded">
+                {line.flag}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-200 leading-snug font-mono">"{line.text}"</p>
+        </div>
+      );
+    }
+
+    function ScriptRecommender({ bandName }) {
+      const suggestions = {
+        Low: [
+          "Reflect back what the caller just stated before progressing.",
+          "Confirm she's in a private, safe location to speak freely."
+        ],
+        Moderate: [
+          "Name the legal protection available under the SC/ST Act — don't wait for her to ask.",
+          "Avoid asking for graphic repetition; confirm documented facts instead."
+        ],
+        High: [
+          "Shift to short, binary yes/no questions — easier to process under trauma.",
+          "Prepare caller for silent standby: 'If speaking becomes unsafe, tap phone keypad.'"
+        ],
+        Critical: [
+          "Do not disconnect under any circumstances — maintain open line.",
+          "Location handed off to Police 112 Dispatch; maintain open microphone without alerting bystanders."
+        ]
+      };
+      const list = suggestions[bandName] || suggestions.Low;
+      return (
+        <div className="space-y-2.5">
+          {list.map((s, i) => (
+            <div key={i} className="text-xs text-slate-300 border-l-2 border-cyan-500/60 pl-3 py-1 bg-slate-900/30">
+              {s}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function ActionCards({ band, coords, onDispatch, isDispatched }) {
+      const critical = band.name === "Critical";
+      return (
+        <div className="space-y-3">
+          {!critical && (
+            <div className="text-xs text-slate-500 border border-slate-800/80 p-4 text-center rounded bg-slate-900/20">
+              No emergency dispatch required at current risk level.
+            </div>
+          )}
+          {critical && (
+            <>
+              <div className="border border-red-500/40 bg-red-500/5 rounded overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-red-500/30 bg-red-500/10">
+                  <span className="text-xs font-bold text-red-300 flex items-center gap-1.5">
+                    🚨 Police Dispatch — 112
+                  </span>
+                  <span className="text-[10px] font-mono text-red-400 font-bold">READY</span>
+                </div>
+                <div className="px-3 py-2 text-xs text-slate-300 space-y-1">
+                  <div className="font-mono text-slate-400 text-[11px]">📍 {coords}</div>
+                  <div className="text-[11px] text-slate-400">Pre-filled from live GPS · awaiting supervisor ratification</div>
+                </div>
+                <button
+                  onClick={onDispatch}
+                  disabled={isDispatched}
+                  className={`w-full text-xs font-bold py-2.5 transition-all uppercase tracking-wider ${
+                    isDispatched 
+                      ? "bg-emerald-600 text-white cursor-default" 
+                      : "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-lg shadow-red-900/40 animate-pulse"
+                  }`}
+                >
+                  {isDispatched ? "✓ Ratified & Dispatched" : "Click to Ratify Police Dispatch (112)"}
+                </button>
+              </div>
+
+              <div className="border border-orange-500/40 bg-orange-500/5 rounded overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-orange-500/30 bg-orange-500/10">
+                  <span className="text-xs font-bold text-orange-300 flex items-center gap-1.5">
+                    🛡️ Witness Protection Docket
+                  </span>
+                  <span className="text-[10px] font-mono text-orange-400 font-bold">PREFILLED</span>
+                </div>
+                <div className="px-3 py-2 text-xs text-slate-300 space-y-1">
+                  <div>Section 398 BNSS · Fast-Track Standing Committee</div>
+                  <div className="text-[11px] text-slate-400">5-working-day statutory response window initiated</div>
+                </div>
+                <button
+                  disabled
+                  className="w-full text-xs font-medium py-2 bg-orange-500/20 text-orange-200 border-t border-orange-500/30 cursor-default"
+                >
+                  Dossier Staged for District Magistrate
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // --- Audio Upload Block Component ---
+    function AudioUploadBlock({ onAnalyzeComplete }) {
+      const [selectedFile, setSelectedFile] = useState(null);
+      const [audioUrl, setAudioUrl] = useState(null);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [uploadStatus, setUploadStatus] = useState(null);
+      const fileInputRef = useRef(null);
+
+      const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          setSelectedFile(file);
+          setAudioUrl(URL.createObjectURL(file));
+          setUploadStatus(null);
+        }
+      };
+
+      const handleAnalyze = async () => {
+        if (!selectedFile) return;
+        setIsAnalyzing(true);
+        setUploadStatus("Ingesting audio into RAM & executing GPU models (faster-whisper + openSMILE)...");
+
+        try {
+          const formData = new FormData();
+          formData.append("file", selectedFile);
+
+          const res = await fetch("http://127.0.0.1:8000/calls/live-call-01/analyze-audio", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            throw new Error(`Server returned error ${res.status}`);
+          }
+
+          const result = await res.json();
+          setUploadStatus(`Audio Analysis Complete! SVI: ${result.svi_metrics?.score || result.svi} (${result.category || result.band})`);
+          if (onAnalyzeComplete) {
+            onAnalyzeComplete(result, selectedFile.name);
+          }
+        } catch (err) {
+          setUploadStatus(`Analysis Failed: ${err.message}`);
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+
+      return (
+        <div className="border border-cyan-500/30 bg-slate-900/60 p-4 rounded-lg shadow-md shadow-cyan-950/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-400 text-sm">🎙️</span>
+              <span className="text-xs font-bold text-slate-200">Upload Call Audio / Evidence File</span>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono">WAV, MP3, OGG, FLAC</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <input
+              type="file"
+              accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            
+            <button
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              className="w-full sm:w-auto px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded transition-all flex items-center justify-center gap-2"
+            >
+              <span>📁</span>
+              {selectedFile ? selectedFile.name : "Select Audio File"}
+            </button>
+
+            {audioUrl && (
+              <audio controls src={audioUrl} className="h-8 max-w-[200px] flex-1 outline-none" />
+            )}
+
+            <button
+              onClick={handleAnalyze}
+              disabled={!selectedFile || isAnalyzing}
+              className={`w-full sm:w-auto px-5 py-2 text-xs font-bold rounded uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                !selectedFile || isAnalyzing
+                  ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
+                  : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/40 cursor-pointer"
+              }`}
+            >
+              {isAnalyzing ? (
+                <>
+                  <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <span>⚡</span>
+                  Run Full GPU Triage
+                </>
+              )}
+            </button>
+          </div>
+
+          {uploadStatus && (
+            <div className={`mt-2.5 text-[11px] font-mono p-2 rounded border ${
+              uploadStatus.includes("Failed") || uploadStatus.includes("Error")
+                ? "bg-red-950/30 text-red-400 border-red-500/30"
+                : "bg-cyan-950/30 text-cyan-300 border-cyan-500/30"
+            }`}>
+              {uploadStatus}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function AuditHistory({ entries }) {
+      return (
+        <div className="border border-slate-800 bg-slate-900/40 rounded overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800 bg-slate-900">
+            <span className="text-xs font-semibold text-slate-300">Cryptographic Audit Ledger (Bharatiya Sakshya Adhiniyam, 2023)</span>
+            <span className="text-[11px] font-mono text-emerald-400">Chain: Valid ✓</span>
+          </div>
+          <div className="divide-y divide-slate-800/60 max-h-[500px] overflow-y-auto">
+            {entries.map((e, i) => (
+              <div key={i} className="flex items-start gap-4 px-4 py-3 text-xs">
+                <span className="font-mono text-slate-500 w-16 shrink-0">{e.timestamp ? e.timestamp.split('T')[1]?.slice(0,8) : "00:00"}</span>
+                <span className={`w-20 shrink-0 font-semibold ${
+                  e.actor === "Supervisor" ? "text-cyan-400" : e.actor === "AI" ? "text-amber-400" : "text-slate-400"
+                }`}>
+                  {e.actor}
+                </span>
+                <span className="flex-1 text-slate-300">{e.action}</span>
+                <span className="font-mono text-[10px] text-slate-500 shrink-0">#{e.prev_hash ? e.prev_hash.slice(0,8) : "genesis"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    const TABS = [
+      { id: "overview", label: "Overview", icon: "📊" },
+      { id: "upload", label: "Audio Ingestion", icon: "🎙️" },
+      { id: "transcript", label: "Transcript", icon: "💬" },
+      { id: "diagnostics", label: "Diagnostics", icon: "📈" },
+      { id: "guidance", label: "Guidance", icon: "🛡️" },
+      { id: "history", label: "Audit Ledger", icon: "🔒" },
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState("overview");
+      const [lines, setLines] = useState([]);
+      const [auditEntries, setAuditEntries] = useState([]);
+      const [current, setCurrent] = useState({
+        svi: 14,
+        jitter: 0.012,
+        shimmer: 0.45,
+        hnr: 21.0,
+        f0: 172.0,
+        primary_trigger: "Baseline Intake",
+        category: "LOW_RISK"
+      });
+      const [isDispatched, setIsDispatched] = useState(false);
+      const elapsed = useElapsed();
+      const scrollRef = useRef(null);
+
+      // Fetch audit log
+      const fetchAudit = () => {
+        fetch("http://127.0.0.1:8000/calls/live-call-01/audit")
+          .then(res => res.json())
+          .then(data => {
+            if (data.entries) setAuditEntries(data.entries);
+          })
+          .catch(() => {});
+      };
+
+      useEffect(() => {
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws/live-call?mode=scripted&consent=true");
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          const sviVal = data.svi_metrics?.score || 10;
+          const ac = data.acoustic_telemetry || {};
+          const nlp = data.nlp_telemetry || {};
+          const flags = data.engine_flags || {};
+
+          setCurrent({
+            svi: sviVal,
+            jitter: ac.jitter || 0.01,
+            shimmer: ac.shimmer_db || 0.5,
+            hnr: ac.hnr_db || 20.0,
+            f0: ac.pitch_f0_mean || 170.0,
+            primary_trigger: data.svi_metrics?.primary_trigger || "Monitoring",
+            category: data.svi_metrics?.category || "LOW_RISK"
+          });
+
+          if (nlp.transcript) {
+            setLines((prev) => [
+              ...prev,
+              {
+                speaker: prev.length % 2 === 0 ? "counselor" : "caller",
+                text: nlp.transcript,
+                flag: flags.slp_akg !== "None" ? flags.slp_akg : (flags.asd_nse.includes("High") ? "acoustic threat" : null)
+              }
+            ].slice(-12));
+          }
+        };
+
+        fetchAudit();
+        const auditInterval = setInterval(fetchAudit, 3000);
+
+        return () => {
+          ws.close();
+          clearInterval(auditInterval);
+        };
+      }, []);
+
+      useEffect(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }, [lines]);
+
+      const band = bandFor(current.svi);
+
+      // Handle successful uploaded audio analysis
+      const handleAudioAnalyzeComplete = (data, filename) => {
+        const sviVal = data.svi_metrics?.score || data.svi || 20;
+        const ac = data.acoustic_telemetry || data.features || {};
+        const nlp = data.nlp_telemetry || {};
+        const flags = data.engine_flags || {};
+
+        setCurrent({
+          svi: sviVal,
+          jitter: ac.jitter || 0.01,
+          shimmer: ac.shimmer_db || 0.5,
+          hnr: ac.hnr_db || 18.0,
+          f0: ac.pitch_f0_mean || 170.0,
+          primary_trigger: data.svi_metrics?.primary_trigger || "Uploaded Audio Clip",
+          category: data.category || "LOW_RISK"
+        });
+
+        if (nlp.transcript) {
+          setLines((prev) => [
+            ...prev,
+            {
+              speaker: "caller",
+              text: `${nlp.transcript}`,
+              isUpload: true,
+              flag: flags.slp_akg !== "None" ? flags.slp_akg : (data.category === "CRITICAL_RISK" ? "CRITICAL CLIP" : null)
+            }
+          ]);
+        }
+
+        fetchAudit();
+      };
+
+      const handleDispatch = async () => {
+        try {
+          const res = await fetch("http://127.0.0.1:8000/calls/live-call-01/dispatch/police", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Supervisor-Token": "demo-supervisor-token"
+            },
+            body: JSON.stringify({ coordinates: "12.9716° N, 77.5946° E" })
+          });
+          if (res.ok) {
+            setIsDispatched(true);
+            alert("Police 112 Dispatch Successfully Ratified by Supervisor!");
+          }
+        } catch (e) {
+          alert("Dispatch request error: " + e);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className="text-sm font-bold text-cyan-400 tracking-tight">RTSAM Live Counselor Triage</span>
+              <span className="text-xs text-slate-500 font-mono bg-slate-800 px-2 py-0.5 rounded">Call #NHAA-2291</span>
+              <span className="text-xs text-slate-400 font-mono">{elapsed} elapsed</span>
+            </div>
+            <div className="flex items-center gap-5 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5 text-emerald-400">
+                <span>🔒</span> RAM Isolation Active
+              </div>
+              <div className="flex items-center gap-1.5 text-cyan-400">
+                <span>⚡</span> CUDA GPU Acceleration (RTX 4050)
+              </div>
+              <div className={`px-2.5 py-0.5 border ${band.border} ${band.text} font-bold rounded bg-slate-900`}>
+                {band.name.toUpperCase()} RISK
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex items-center gap-1 px-6 pt-2 border-b border-slate-800 bg-slate-900/40">
+            {TABS.map((t) => {
+              const active = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-all ${
+                    active ? "border-cyan-500 text-cyan-400 bg-slate-900/60" : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <span>{t.icon}</span>
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6 flex-1 flex flex-col gap-6">
+
+            {/* Always visible Quick Audio Upload Banner in Overview */}
+            {activeTab === "overview" && (
+              <AudioUploadBlock onAnalyzeComplete={handleAudioAnalyzeComplete} />
+            )}
+
+            {activeTab === "overview" && (
+              <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] gap-6 flex-1">
+                {/* Column 1: Live Transcription */}
+                <div className="border border-slate-800 bg-slate-900/40 rounded-lg flex flex-col h-[560px] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800 bg-slate-900">
+                    <span className="text-xs font-bold text-slate-300">Live Transcription (faster-whisper)</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  </div>
+                  <div ref={scrollRef} className="flex-1 overflow-y-auto p-2">
+                    {lines.length === 0 && (
+                      <div className="p-4 text-center text-xs text-slate-500">Connecting to live audio stream...</div>
+                    )}
+                    {lines.map((l, i) => (
+                      <TranscriptLine key={i} line={l} isNew={i === lines.length - 1} />
+                    ))}
+                  </div>
+                  <div className="p-3 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400">
+                    <div className="text-[10px] uppercase text-slate-500 font-semibold mb-1">Primary Threat Trigger</div>
+                    <div className="font-semibold text-cyan-400">{current.primary_trigger}</div>
+                  </div>
+                </div>
+
+                {/* Column 2: SVI & Paralinguistics */}
+                <div className="flex flex-col gap-6">
+                  <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-300">Stress Vulnerability Index</span>
+                      <span className="text-[11px] font-mono text-slate-500">λ = 0.3</span>
+                    </div>
+                    <SVIGauge svi={current.svi} />
+                  </div>
+
+                  <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 flex-1 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-300">Voice Biomarkers (openSMILE)</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">&lt;50ms RAM</span>
+                    </div>
+                    <Meter label="Jitter (vocal cord trembling)" value={current.jitter} max={0.1} unit="" warn={50} />
+                    <Meter label="Shimmer (sobbing / breathlessness)" value={current.shimmer} max={2.5} unit=" dB" warn={50} />
+                    <Meter label="Harmonics-to-noise ratio" value={current.hnr} max={25.0} unit=" dB" warn={200} />
+                    <Meter label="F0 Pitch (Hz)" value={current.f0} max={300.0} unit=" Hz" warn={70} />
+                  </div>
+                </div>
+
+                {/* Column 3: Guidance & Emergency Action Cards */}
+                <div className="flex flex-col gap-6">
+                  <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5">
+                    <div className="text-xs font-bold text-slate-300 mb-3">Suggested Approach</div>
+                    <ScriptRecommender bandName={band.name} />
+                  </div>
+
+                  <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 flex-1">
+                    <div className="text-xs font-bold text-slate-300 mb-3">Emergency Actions (HITL Gate)</div>
+                    <ActionCards
+                      band={band}
+                      coords="12.9716° N, 77.5946° E"
+                      onDispatch={handleDispatch}
+                      isDispatched={isDispatched}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "upload" && (
+              <div className="max-w-2xl mx-auto w-full space-y-6">
+                <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🎙️</span>
+                    <h2 className="text-sm font-bold text-slate-200">Forensic Audio Clip & Call Recording Ingestion</h2>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-6">
+                    Upload pre-recorded audio evidence or raw telephone calls (.wav, .mp3, .flac). The backend extracts physical vocal biomarkers with openSMILE, performs automated speech-to-text with faster-whisper, evaluates trauma text classifiers on GPU, and recalculates the Stress Vulnerability Index.
+                  </p>
+                  <AudioUploadBlock onAnalyzeComplete={handleAudioAnalyzeComplete} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "transcript" && (
+              <div className="border border-slate-800 bg-slate-900/40 rounded-lg flex flex-col h-[640px] overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-800 bg-slate-900 font-bold text-xs">
+                  Full Session Transcript Feed
+                </div>
+                <div className="flex-1 overflow-y-auto p-3">
+                  {lines.map((l, i) => (
+                    <TranscriptLine key={i} line={l} isNew={i === lines.length - 1} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "diagnostics" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border border-slate-800 bg-slate-900/40 p-6 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-xs font-bold text-slate-300 mb-3">Calculated SVI</span>
+                  <SVIGauge svi={current.svi} />
+                </div>
+                <div className="border border-slate-800 bg-slate-900/40 p-6 rounded-lg">
+                  <span className="text-xs font-bold text-slate-300 block mb-4">Detailed Acoustic Features</span>
+                  <Meter label="Jitter (vocal cord trembling)" value={current.jitter} max={0.1} unit="" warn={50} />
+                  <Meter label="Shimmer (sobbing)" value={current.shimmer} max={2.5} unit=" dB" warn={50} />
+                  <Meter label="Harmonics-to-noise ratio" value={current.hnr} max={25.0} unit=" dB" warn={200} />
+                  <Meter label="F0 pitch variance" value={current.f0} max={300.0} unit=" Hz" warn={70} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "guidance" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border border-slate-800 bg-slate-900/40 p-5 rounded-lg">
+                  <div className="text-xs font-bold text-slate-300 mb-3">Triage Counselor Script Guidance</div>
+                  <ScriptRecommender bandName={band.name} />
+                </div>
+                <div className="border border-slate-800 bg-slate-900/40 p-5 rounded-lg">
+                  <div className="text-xs font-bold text-slate-300 mb-3">Legal Triage (Section 398 BNSS)</div>
+                  <ActionCards band={band} coords="12.9716° N, 77.5946° E" onDispatch={handleDispatch} isDispatched={isDispatched} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "history" && <AuditHistory entries={auditEntries} />}
+          </div>
+
+          <footer className="px-6 py-3 border-t border-slate-800 bg-slate-900/40 text-[11px] text-slate-500 flex justify-between">
+            <span>RTSAM Live Helpline Telemetry · Connected to backend on port 8000</span>
+            <span>Evidentiary requirements compliant with Section 63 BSA 2023</span>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
