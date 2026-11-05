@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-**RTSAM** (Real-Time Stress Assessment & Multimodal Helpline Triage) is a CUDA-accelerated FastAPI backend for the **NHAA 14566 Helpline Counselor Dashboard**. It performs real-time multimodal analysis of helpline calls to triage victims of SC/ST atrocities, suicide risk, and active threats.
+**RTSAM** (Real-Time Stress Assessment & Multimodal Helpline Triage) is a CUDA-accelerated FastAPI backend for the **Helpline Counselor Dashboard**. It performs real-time multimodal analysis of helpline calls to triage victims of violence, coercion, severe harassment, suicide risk, and active threats.
 
 ---
 
@@ -87,14 +87,14 @@ When a live audio chunk arrives, **three parallel engines** process it:
 #### 🗣️ B. ASR Engine ([`asr_engine.py`](file:///c:/miniProj/RTSAM/asr_engine.py))
 1. **faster-whisper** (small model) on CUDA float16 (CPU int8 fallback)
 2. **Silero VAD** filtering (`min_silence_duration_ms=500`) rejects noise
-3. **Context prompt injection**: _"NHAA 14566 helpline call involving SC/ST atrocity, trauma, FIR, legal aid"_
+3. **Context prompt injection**: _"Emergency helpline call involving trauma, distress, harassment, threats, FIR, legal aid"_
 4. **3-second sliding window** with **0.5-second overlap** via `AudioBufferManager`
 5. Returns transcription text
 
 #### 🧠 C. NLP / Text Classifier ([`svi_engine.py`](file:///c:/miniProj/RTSAM/svi_engine.py))
 1. **suicidal-bert** (`gohjiayi/suicidal-bert`) on GPU → outputs `P(suicide)`
 2. **Panic heuristics** via keyword matching → outputs `P(panic)`
-3. **SC/ST Act violation detection** via regex lexicons (landlord, well, untouchable, caste, etc.)
+3. **Civil rights & coercion detection** via regex lexicons (landlord, intimidation, eviction, coercion, etc.)
 4. **Critical marker regex** for weapons, mob attacks, hostages, murder, rape
 5. Falls back to **lexicon heuristic** if transformers unavailable
 
@@ -160,7 +160,7 @@ When SVI reaches **CRITICAL_RISK**, the system auto-triggers:
 | **Supervisor Barge-In** | Supervisor audio channel activated |
 | **ATSS Timer** | Countdown timer for auto-escalation |
 | **Police 112 Dispatch** | Human-in-the-loop gate — requires `X-Supervisor-Token` |
-| **Witness Protection** | Docket pre-filled for SC/ST Act violations |
+| **Witness Protection** | Docket pre-filled for civil rights and intimidation violations |
 
 Dispatch endpoints require:
 1. Valid `X-Supervisor-Token` header
@@ -204,8 +204,8 @@ The scripted mode cycles through these edge cases from [`call_script.py`](file:/
 |---|-----|----------|----------|
 | 1 | 12 | LOW | Baseline intake, DPDP recorded |
 | 2 | 24 | LOW | Hesitant initial report |
-| 3 | 42 | MODERATE | SC/ST public humiliation |
-| 4 | 62 | HIGH | Enforced untouchability & coercion |
+| 3 | 42 | MODERATE | Public harassment & humiliation |
+| 4 | 62 | HIGH | Severe coercion & basic rights deprivation |
 | 5 | 76 | HIGH | Stealth whispering, someone outside |
 | 6 | 88 | **CRITICAL** | Active mob attack, broken gate |
 | 7 | 92 | **CRITICAL** | Cognitive freeze, DTMF tap only |

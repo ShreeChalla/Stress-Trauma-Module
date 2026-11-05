@@ -1,6 +1,6 @@
 # RTSAM Backend (CUDA GPU & Multimodal Helpline Triage)
 
-An accelerated FastAPI backend for the NHAA Helpline Counselor Dashboard, featuring:
+An accelerated FastAPI backend for the Crisis Helpline Counselor Dashboard, featuring:
 - **Sigmoid Late Fusion SVI Engine** with deterministic hard overrides ($\delta_{\text{critical}} = 0.50$) for active weapon/mob attacks, $P_{\text{suicide}} > 0.80$, or $P_{\text{panic}} > 0.80$.
 - **Real-Time ASR Engine** (`faster-whisper` on CUDA with Silero VAD suppression and context prompt injection).
 - **Acoustic Paralinguistics** via `opensmile` eGeMAPSv02 ($F_0$, Jitter, Shimmer, HNR) extracting voice biomarkers directly from 16kHz RAM arrays in <50ms.
@@ -45,7 +45,7 @@ ws://localhost:8000/ws/live-call?mode=scripted&consent=true
 
 ### Query Parameters:
 - `mode`:
-  - `"scripted"` (default for dashboard demo): Emits realistic pre-recorded 3-second edge case payloads (Monotone "Freeze", Stealth Whispering, SC/ST Overrides).
+  - `"scripted"` (default for dashboard demo): Emits realistic pre-recorded 3-second edge case payloads (Monotone "Freeze", Stealth Whispering, Coercion & Threat Overrides).
   - `"real"`: Production GPU ingestion receiving live 16kHz audio chunks, executing `faster-whisper`, `openSMILE`, and PyTorch transformer heads.
 - `consent`:
   - `true` (default): Full AI biometric and transcription pipeline active.
@@ -58,7 +58,7 @@ ws://localhost:8000/ws/live-call?mode=scripted&consent=true
   "svi_metrics": {
     "score": 88,
     "category": "CRITICAL_RISK",
-    "primary_trigger": "Active Mob Attack & Atrocity Threat"
+    "primary_trigger": "Active Mob Attack & Violence Threat"
   },
   "acoustic_telemetry": {
     "pitch_f0_mean": 182.4,
@@ -74,7 +74,7 @@ ws://localhost:8000/ws/live-call?mode=scripted&consent=true
   "engine_flags": {
     "bpab": "Background Shouting & Breaking Glass",
     "asd_nse": "Acoustic-Semantic Dissonance High",
-    "slp_akg": "SC/ST Act Violation (Enforced Untouchability)",
+    "slp_akg": "Civil Rights Violation (Basic Rights Deprivation)",
     "nc_acsm": "Stealth Mode Standby"
   },
   "system_actions": {

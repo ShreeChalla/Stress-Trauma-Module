@@ -193,6 +193,7 @@ async def live_call_stream(
                         "jitter": acoustic["jitter"],
                         "shimmer_db": acoustic["shimmer_db"],
                         "hnr_db": acoustic["hnr_db"],
+                        "speech_rate_wpm": acoustic.get("speech_rate_wpm", 0.0),
                     },
                     "nlp_telemetry": {
                         "transcript": transcript or "[ambient audio monitored]",
@@ -200,16 +201,16 @@ async def live_call_stream(
                         "p_panic": round(p_panic, 2),
                     },
                     "engine_flags": {
-                        "bpab": "Background Acoustic Monitored",
+                        "bpab": acoustic.get("bpab_status", "Background Acoustic Monitored"),
                         "asd_nse": "Acoustic-Semantic Dissonance High" if abs(acoustic["acoustic_score"] - p_panic) > 0.4 else "Nominal",
-                        "slp_akg": "SC/ST Act Violation Flagged" if flags.get("sc_st_violation") else "None",
+                        "slp_akg": "Civil Rights Violation Flagged" if (flags.get("civil_rights_violation") or flags.get("sc_st_violation")) else "None",
                         "nc_acsm": "Stealth Mode Standby" if is_critical else "Standard Audio Mode",
                     },
                     "system_actions": {
                         "supervisor_barge_in": is_critical,
                         "atss_timer_active": is_critical,
                         "atss_seconds_remaining": 22 if is_critical else 0,
-                        "witness_protection_prefilled": flags.get("sc_st_violation", False),
+                        "witness_protection_prefilled": bool(flags.get("civil_rights_violation") or flags.get("sc_st_violation")),
                         "police_112_dispatch_ready": is_critical,
                     },
                 }
@@ -342,14 +343,14 @@ async def analyze_audio(call_id: str, file: UploadFile = File(...)):
         "engine_flags": {
             "bpab": "Uploaded Recording Analyzed",
             "asd_nse": "Acoustic-Semantic Dissonance High" if abs(features["acoustic_score"] - p_panic) > 0.4 else "Nominal",
-            "slp_akg": "SC/ST Act Violation Flagged" if flags.get("sc_st_violation") else "None",
+            "slp_akg": "Civil Rights Violation Flagged" if (flags.get("civil_rights_violation") or flags.get("sc_st_violation")) else "None",
             "nc_acsm": "Stealth Mode Standby" if is_critical else "Standard Audio Mode",
         },
         "system_actions": {
             "supervisor_barge_in": is_critical,
             "atss_timer_active": is_critical,
             "atss_seconds_remaining": 22 if is_critical else 0,
-            "witness_protection_prefilled": flags.get("sc_st_violation", False),
+            "witness_protection_prefilled": bool(flags.get("civil_rights_violation") or flags.get("sc_st_violation")),
             "police_112_dispatch_ready": is_critical,
         },
         "features": features,

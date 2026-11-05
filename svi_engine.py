@@ -34,10 +34,10 @@ CRITICAL_EXPLICIT_MARKERS = [
     r"\bbroke our (gate|door)\b", r"\bkill myself\b", r"\bend my life\b"
 ]
 
-SC_ST_LEXICONS = [
-    r"\blandlord\b", r"\bwell\b", r"\buntouchable\b", r"\buntouchability\b",
-    r"\bdraw water\b", r"\bfield\b", r"\bthreatened to burn\b", r"\bjaati\b",
-    r"\bcaste\b", r"\bfront of the whole street\b", r"\bnot let us\b"
+CIVIL_PROTECTION_LEXICONS = [
+    r"\blandlord\b", r"\bwell\b", r"\bdraw water\b", r"\bfield\b",
+    r"\bthreatened to burn\b", r"\bfront of the whole street\b", r"\bnot let us\b",
+    r"\bthreatened\b", r"\beviction\b", r"\bextortion\b", r"\bblackmail\b", r"\bharassment\b"
 ]
 
 
@@ -45,7 +45,7 @@ class TextClassifierPipeline:
     """
     Manages transformer-based text scoring on GPU (device='cuda') with fallback.
     - gohjiayi/suicidal-bert for P_suicide
-    - IndicBERT/trauma classifier or zero-shot head for P_panic and SC/ST violations
+    - IndicBERT/trauma classifier or zero-shot head for P_panic and coercion/threat violations
     """
     def __init__(self, device: str = "cuda"):
         self.device = device
@@ -91,6 +91,7 @@ class TextClassifierPipeline:
         p_panic = 0.05
         flags = {
             "critical_marker": False,
+            "civil_rights_violation": False,
             "sc_st_violation": False,
             "primary_trigger": "Baseline Monitored Call",
         }
@@ -102,15 +103,16 @@ class TextClassifierPipeline:
         for pattern in CRITICAL_EXPLICIT_MARKERS:
             if re.search(pattern, text_lower):
                 flags["critical_marker"] = True
-                flags["primary_trigger"] = "Active Mob Attack & Atrocity Threat"
+                flags["primary_trigger"] = "Active Attack & Violence Threat"
                 p_panic = max(p_panic, 0.92)
 
-        # 2. Check SC/ST Act violation markers
-        for pattern in SC_ST_LEXICONS:
+        # 2. Check coercion & rights protection markers
+        for pattern in CIVIL_PROTECTION_LEXICONS:
             if re.search(pattern, text_lower):
+                flags["civil_rights_violation"] = True
                 flags["sc_st_violation"] = True
                 if not flags["critical_marker"]:
-                    flags["primary_trigger"] = "SC/ST Act Violation (Enforced Untouchability)"
+                    flags["primary_trigger"] = "Severe Coercion & Rights Deprivation"
                 p_panic = max(p_panic, 0.65)
 
         # 3. Model inference for suicide if model is loaded
