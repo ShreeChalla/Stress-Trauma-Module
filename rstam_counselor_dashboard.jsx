@@ -22,11 +22,11 @@ import {
 // loops. Nothing here calls a backend — it's a front-end simulation only.
 // ---------------------------------------------------------------------------
 const CALL_SCRIPT = [
-  { speaker: "counselor", text: "NHAA helpline, you're speaking with Divya. You're safe on this line — go ahead.", svi: 8, jitter: 0.3, shimmer: 1.1, hnr: 21, f0: 4 },
+  { speaker: "counselor", text: "Helpline, you're speaking with Divya. You're safe on this line — go ahead.", svi: 8, jitter: 0.3, shimmer: 1.1, hnr: 21, f0: 4 },
   { speaker: "caller", text: "Hello... yes, I wanted to report something that happened yesterday.", svi: 14, jitter: 0.6, shimmer: 1.6, hnr: 19, f0: 7 },
   { speaker: "caller", text: "It was just one slap in the field, I am fine, I don't want trouble.", svi: 22, jitter: 0.8, shimmer: 2.0, hnr: 18, f0: 9 },
   { speaker: "counselor", text: "I hear you. Can you tell me a little about who was involved?", svi: 24, jitter: 0.8, shimmer: 2.0, hnr: 18, f0: 9, flag: "power-imbalance" },
-  { speaker: "caller", text: "It was the landlord. In front of the whole street. Everyone saw.", svi: 41, jitter: 1.4, shimmer: 3.1, hnr: 15, f0: 14, flag: "sc/st act" },
+  { speaker: "caller", text: "It was the landlord. In front of the whole street. Everyone saw.", svi: 41, jitter: 1.4, shimmer: 3.1, hnr: 15, f0: 14, flag: "rights violation" },
   { speaker: "caller", text: "They said if I complain they will not let us draw water again.", svi: 52, jitter: 1.9, shimmer: 3.8, hnr: 13, f0: 18, flag: "coercion" },
   { speaker: "counselor", text: "That's not something you have to accept. You did the right thing calling.", svi: 49, jitter: 1.8, shimmer: 3.6, hnr: 13, f0: 17 },
   { speaker: "caller", text: "There— there is someone outside. I have to be quiet a moment.", svi: 74, jitter: 2.9, shimmer: 5.4, hnr: 9, f0: 26, flag: "acoustic threat" },
@@ -44,7 +44,7 @@ const CALL_SCRIPT = [
 const AUDIT_LOG = [
   { time: "00:00", actor: "System", action: "Call ingested, DPDP consent recorded", hash: "a1f9c3e0" },
   { time: "00:12", actor: "AI", action: "SVI computed: 24 (Moderate) — power-imbalance flag raised", hash: "d84b7211" },
-  { time: "00:15", actor: "AI", action: "SC/ST Act ontology match: public humiliation clause", hash: "5e2a9f0c" },
+  { time: "00:15", actor: "AI", action: "Protection ontology match: public harassment clause", hash: "5e2a9f0c" },
   { time: "00:24", actor: "AI", action: "Critical override triggered — hard trigger delta_critical applied", hash: "9c113ab4" },
   { time: "00:27", actor: "AI", action: "Stealth mode + DTMF keypad triage activated", hash: "77fbe602" },
   { time: "00:30", actor: "Supervisor", action: "Barge-in acknowledged, call taken over", hash: "2d908e1a" },
@@ -177,7 +177,7 @@ function ScriptRecommender({ band }) {
       "Confirm she's somewhere she can keep talking safely.",
     ],
     Moderate: [
-      "Name the legal protection available under the SC/ST Act — don't wait for her to ask.",
+      "Name the legal protection and emergency aid available — don't wait for them to ask.",
       "Avoid asking her to repeat graphic detail; confirm what you already have instead.",
     ],
     High: [
@@ -411,7 +411,7 @@ export default function CounselorDashboard() {
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/60">
         <div className="flex items-center gap-3">
           <Phone size={16} className="text-cyan-400" />
-          <span className="text-sm font-medium">Call #NHAA-2291</span>
+          <span className="text-sm font-medium">Call #RTSAM-2291</span>
           <span className="text-xs text-slate-500 font-mono">{elapsed} elapsed</span>
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-400">
@@ -505,10 +505,12 @@ export default function CounselorDashboard() {
                   <ShieldAlert size={14} className="text-slate-400" />
                   <span className="text-sm text-slate-300">Emergency actions</span>
                 </div>
+                <ActionCards band={band} coords="12.9716° N, 77.5946° E" />
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {activeTab === "upload" && (
           <div className="max-w-2xl mx-auto p-4">

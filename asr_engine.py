@@ -13,8 +13,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 INITIAL_PROMPT = (
-    "Context: NHAA 14566 helpline call involving SC/ST atrocity, trauma, FIR, "
-    "legal aid, and immediate triage."
+    "Context: Emergency crisis helpline call involving trauma, distress, harassment, "
+    "threats, FIR, legal aid, and immediate triage."
 )
 
 
